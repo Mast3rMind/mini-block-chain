@@ -12,19 +12,19 @@ class Block(val version: Int, val height: Long, val parentHash: ByteArray, val m
             val coinBase: ByteArray, val time: DateTime, val difficulty: Int,
             val nonce: Int, val totalDifficulty: BigInteger, val transactions: List<Transaction>) {
 
-  val header = BlockHeader(version, height, parentHash, merkleRoot, coinBase, time, difficulty, nonce, totalDifficulty)
+    val header = BlockHeader(version, height, parentHash, merkleRoot, coinBase, time, difficulty, nonce, totalDifficulty)
 
-  /**
-   * 区块(Block)的哈希值(KECCAK-256)
-   */
-  val hash: ByteArray
-    get() = CryptoUtil.hashBlock(this)
+    /**
+     * 区块(Block)的哈希值(KECCAK-256)
+     */
+    val hash: ByteArray
+        get() = CryptoUtil.hashBlock(this)
 
-  fun encode(): ByteArray {
-    return CodecUtil.encodeBlock(this)
-  }
+    fun encode(): ByteArray {
+        return CodecUtil.encodeBlock(this)
+    }
 
-  override fun toString(): String {
-    return "ver:$version h:$height, nonce:$nonce, dt:$difficulty, tt: $totalDifficulty, time:$time"
-  }
+    override fun toString(): String {
+        return "ver:$version h:$height, nonce:$nonce, dt:$difficulty, tt: $totalDifficulty, time:$time"
+    }
 }

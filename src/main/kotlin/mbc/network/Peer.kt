@@ -15,116 +15,116 @@ import java.math.BigInteger
  */
 class Peer(val node: Node, val manager: BlockChainManager, val channel: Channel) {
 
-  private val logger = LoggerFactory.getLogger(Peer::class.java)
+    private val logger = LoggerFactory.getLogger(Peer::class.java)
 
-  var protocolVersion: Int? = null
-  var networkId: Int? = null
-  var totalDifficulty: BigInteger? = null
-  var bestHash: ByteArray? = null
-  var genesisHash: ByteArray? = null
+    var protocolVersion: Int? = null
+    var networkId: Int? = null
+    var totalDifficulty: BigInteger? = null
+    var bestHash: ByteArray? = null
+    var genesisHash: ByteArray? = null
 
-  var handshakeComplete = false
+    var handshakeComplete = false
 
-  /**
-   * 关闭Peer。
-   */
-  fun close() {
-    this.channel.close()
-  }
+    /**
+     * 关闭Peer。
+     */
+    fun close() {
+        this.channel.close()
+    }
 
-  /**
-   * 建立连接后应该首先握手(发送并接收HELLO消息)。
-   */
-  fun sendHelloMessage() {
-    val config = manager.blockChain.config
+    /**
+     * 建立连接后应该首先握手(发送并接收HELLO消息)。
+     */
+    fun sendHelloMessage() {
+        val config = manager.blockChain.config
 
-    val msg = HelloMessage(config.getPeerVersion(), config.getClientId(), config.getPeerListenPort(),
-                           config.getNodeId()!!)
+        val msg = HelloMessage(config.getPeerVersion(), config.getClientId(), config.getPeerListenPort(),
+                config.getNodeId()!!)
 
-    logger.debug("${node.nodeId} say HELLO to ${channel.remoteAddress()}")
+        logger.debug("${node.nodeId} say HELLO to ${channel.remoteAddress()}")
 
-    sendMessage(msg)
-  }
+        sendMessage(msg)
+    }
 
-  /**
-   * 握手成功后应该首先向对方发送STATUS消息。
-   */
-  fun sendStatusMessage() {
-    val config = manager.blockChain.config
+    /**
+     * 握手成功后应该首先向对方发送STATUS消息。
+     */
+    fun sendStatusMessage() {
+        val config = manager.blockChain.config
 
-    val bestBlock = manager.blockChain.bestBlock
-    val genesisBlock = config.getGenesisBlock()
-    val msg = StatusMessage(config.getPeerVersion(), config.getNetworkId(), bestBlock.totalDifficulty, bestBlock.hash,
-                            genesisBlock.hash)
+        val bestBlock = manager.blockChain.bestBlock
+        val genesisBlock = config.getGenesisBlock()
+        val msg = StatusMessage(config.getPeerVersion(), config.getNetworkId(), bestBlock.totalDifficulty, bestBlock.hash,
+                genesisBlock.hash)
 
-    logger.debug("${node.nodeId} send STATUS to ${channel.remoteAddress()}")
+        logger.debug("${node.nodeId} send STATUS to ${channel.remoteAddress()}")
 
-    sendMessage(msg)
-  }
+        sendMessage(msg)
+    }
 
-  /**
-   * 发送交易数据。
-   */
-  fun sendTransaction(trx: Transaction) {
-    val msg = NewTransactionsMessage(listOf(trx))
+    /**
+     * 发送交易数据。
+     */
+    fun sendTransaction(trx: Transaction) {
+        val msg = NewTransactionsMessage(listOf(trx))
 
-    sendMessage(msg)
-  }
+        sendMessage(msg)
+    }
 
-  /**
-   * 发送新的区块。
-   */
-  fun sendNewBlock(block: Block) {
-    val msg = NewBlockMessage(block)
+    /**
+     * 发送新的区块。
+     */
+    fun sendNewBlock(block: Block) {
+        val msg = NewBlockMessage(block)
 
-    sendMessage(msg)
-  }
+        sendMessage(msg)
+    }
 
-  /**
-   * 发送区块。
-   */
-  fun sendBlocks(blocks: List<Block>) {
-    val msg = BlocksMessage(blocks)
+    /**
+     * 发送区块。
+     */
+    fun sendBlocks(blocks: List<Block>) {
+        val msg = BlocksMessage(blocks)
 
-    sendMessage(msg)
-  }
+        sendMessage(msg)
+    }
 
-  /**
-   * 下载区块。
-   */
-  fun sendGetBlocks(fromHeight: Long, numOfBlocks: Int) {
-    val msg = GetBlocksMessage(fromHeight, numOfBlocks)
+    /**
+     * 下载区块。
+     */
+    fun sendGetBlocks(fromHeight: Long, numOfBlocks: Int) {
+        val msg = GetBlocksMessage(fromHeight, numOfBlocks)
 
-    sendMessage(msg)
-  }
+        sendMessage(msg)
+    }
 
-  /**
-   * 下载节点列表。
-   */
-  fun sendGetPeers() {
-    val msg = GetNodesMessage()
+    /**
+     * 下载节点列表。
+     */
+    fun sendGetPeers() {
+        val msg = GetNodesMessage()
 
-    sendMessage(msg)
-  }
+        sendMessage(msg)
+    }
 
-  /**
-   * 发送节点列表。
-   */
-  fun sendPeers(peers: List<Node>) {
-    val msg = NodesMessage(peers)
+    /**
+     * 发送节点列表。
+     */
+    fun sendPeers(peers: List<Node>) {
+        val msg = NodesMessage(peers)
 
-    sendMessage(msg)
-  }
+        sendMessage(msg)
+    }
 
-  /**
-   * 发送消息包。消息包的格式为[code(1 byte)][msg]
-   */
-  private fun sendMessage(msg: Message) {
-    NetworkUtil.sendMessage(channel, msg)
-  }
+    /**
+     * 发送消息包。消息包的格式为[code(1 byte)][msg]
+     */
+    private fun sendMessage(msg: Message) {
+        NetworkUtil.sendMessage(channel, msg)
+    }
 
-  override fun toString(): String {
-    return "[Peer:${channel.remoteAddress()}]"
-  }
+    override fun toString(): String {
+        return "[Peer:${channel.remoteAddress()}]"
+    }
 
 }

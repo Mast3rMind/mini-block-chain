@@ -16,174 +16,174 @@ import org.slf4j.LoggerFactory
  */
 class MessageDecodeHandler(val peer: Peer) : ByteToMessageDecoder() {
 
-  private val logger = LoggerFactory.getLogger(MessageDecodeHandler::class.java)
+    private val logger = LoggerFactory.getLogger(MessageDecodeHandler::class.java)
 
-  private val manager: BlockChainManager = peer.manager
+    private val manager: BlockChainManager = peer.manager
 
-  private val repository: Repository = peer.manager.blockChain.repository
+    private val repository: Repository = peer.manager.blockChain.repository
 
-  lateinit var ctx: ChannelHandlerContext
+    lateinit var ctx: ChannelHandlerContext
 
-  override fun decode(ctx: ChannelHandlerContext, data: ByteBuf, out: MutableList<Any>) {
-    this.ctx = ctx
+    override fun decode(ctx: ChannelHandlerContext, data: ByteBuf, out: MutableList<Any>) {
+        this.ctx = ctx
 
-    val code = data.readByte()
+        val code = data.readByte()
 
-    val buffer = ByteArray(data.readableBytes())
-    data.readBytes(buffer)
+        val buffer = ByteArray(data.readableBytes())
+        data.readBytes(buffer)
 
-    try {
-      when (code) {
-        MessageCodes.DISCONNECT.code -> processDisconnect()
-        MessageCodes.STATUS.code -> processStatus(StatusMessage.decode(buffer))
-        MessageCodes.GET_NODES.code -> processGetNodes(GetNodesMessage.decode(buffer))
-        MessageCodes.NODES.code -> processNodes(NodesMessage.decode(buffer))
-        MessageCodes.NEW_TRANSACTIONS.code -> processNewTransactions(NewTransactionsMessage.decode(buffer))
-        MessageCodes.NEW_BLOCK.code -> processNewBlock(NewBlockMessage.decode(buffer))
-        MessageCodes.GET_BLOCKS.code -> processGetBlocks(GetBlocksMessage.decode(buffer))
-        MessageCodes.BLOCKS.code -> processBlocks(BlocksMessage.decode(buffer))
-      }
-    } catch (e: Exception) {
-      logger.error("Process message packet failed!")
+        try {
+            when (code) {
+                MessageCodes.DISCONNECT.code -> processDisconnect()
+                MessageCodes.STATUS.code -> processStatus(StatusMessage.decode(buffer))
+                MessageCodes.GET_NODES.code -> processGetNodes(GetNodesMessage.decode(buffer))
+                MessageCodes.NODES.code -> processNodes(NodesMessage.decode(buffer))
+                MessageCodes.NEW_TRANSACTIONS.code -> processNewTransactions(NewTransactionsMessage.decode(buffer))
+                MessageCodes.NEW_BLOCK.code -> processNewBlock(NewBlockMessage.decode(buffer))
+                MessageCodes.GET_BLOCKS.code -> processGetBlocks(GetBlocksMessage.decode(buffer))
+                MessageCodes.BLOCKS.code -> processBlocks(BlocksMessage.decode(buffer))
+            }
+        } catch (e: Exception) {
+            logger.error("Process message packet failed!")
+        }
+
     }
 
-  }
+    private fun processGetNodes(msg: GetNodesMessage?) {
 
-  private fun processGetNodes(msg: GetNodesMessage?) {
+        logger.debug("Processing GetNodesMessage")
 
-    logger.debug("Processing GetNodesMessage")
+        if (msg == null) {
+            throw MessageDecodeException("GetNodesMessage decode failed.")
+        }
 
-    if (msg == null) {
-      throw MessageDecodeException("GetNodesMessage decode failed.")
+        /**
+         * Do not include the connected peer to the node list.
+         */
+        val peers = manager.peers.minus(peer)
+
+        val nodeList = mutableListOf<Node>()
+        peers.forEach { nodeList.add(it.node) }
+
+        peer.sendPeers(nodeList)
     }
 
     /**
-     * Do not include the connected peer to the node list.
+     * Peers handler.
+     *
+     * TODO: 发现逻辑。
      */
-    val peers = manager.peers.minus(peer)
+    private fun processNodes(msg: NodesMessage?) {
+        logger.debug("Processing NodesMessage")
 
-    val nodeList = mutableListOf<Node>()
-    peers.forEach { nodeList.add(it.node) }
+        if (msg == null) {
+            throw MessageDecodeException("NodesMessage decode failed.")
+        }
 
-    peer.sendPeers(nodeList)
-  }
-
-  /**
-   * Peers handler.
-   *
-   * TODO: 发现逻辑。
-   */
-  private fun processNodes(msg: NodesMessage?) {
-    logger.debug("Processing NodesMessage")
-
-    if (msg == null) {
-      throw MessageDecodeException("NodesMessage decode failed.")
+        manager.discoveryNodes.addAll(msg.nodes)
     }
 
-    manager.discoveryNodes.addAll(msg.nodes)
-  }
+    private fun processGetBlocks(msg: GetBlocksMessage?) {
 
-  private fun processGetBlocks(msg: GetBlocksMessage?) {
+        logger.debug("Processing GetBlocksMessage")
 
-    logger.debug("Processing GetBlocksMessage")
+        if (msg == null) {
+            throw MessageDecodeException("GetBlocksMessage decode failed.")
+        }
 
-    if (msg == null) {
-      throw MessageDecodeException("GetBlocksMessage decode failed.")
+        val fromHeight = msg.fromHeight
+        val numOfBlocks = msg.numOfBlocks
+
+        val blockHashs = mutableListOf<ByteArray>()
+        if (repository != null) {
+            for (i in fromHeight..fromHeight + numOfBlocks) {
+                val blockInfos = repository.getBlockInfos(i)
+
+                blockInfos?.forEach { if (it.isMain) blockHashs.add(it.hash) }
+            }
+        }
+
+        val blocks = mutableListOf<Block>()
+        blockHashs.forEach { repository.getBlock(it)?.let { blocks.add(it) } }
+
+        peer.sendBlocks(blocks)
     }
 
-    val fromHeight = msg.fromHeight
-    val numOfBlocks = msg.numOfBlocks
+    /**
+     * Blocks handler.
+     *
+     * TODO: 分叉逻辑。
+     */
+    private fun processBlocks(msg: BlocksMessage?) {
+        logger.debug("Processing BlocksMessage")
 
-    val blockHashs = mutableListOf<ByteArray>()
-    if (repository != null) {
-      for (i in fromHeight..fromHeight + numOfBlocks) {
-        val blockInfos = repository.getBlockInfos(i)
+        if (msg == null) {
+            throw MessageDecodeException("BlocksMessage decode failed.")
+        }
 
-        blockInfos?.forEach { if (it.isMain) blockHashs.add(it.hash) }
-      }
+        manager.processPeerBlocks(peer, msg.blocks)
     }
 
-    val blocks = mutableListOf<Block>()
-    blockHashs.forEach { repository.getBlock(it)?.let { blocks.add(it) } }
+    /**
+     * NewBlock handler
+     */
+    private fun processNewBlock(msg: NewBlockMessage?) {
+        logger.debug("Processing NewBlockMessage")
 
-    peer.sendBlocks(blocks)
-  }
+        if (msg == null) {
+            throw MessageDecodeException("NewBlockMessage decode failed.")
+        }
 
-  /**
-   * Blocks handler.
-   *
-   * TODO: 分叉逻辑。
-   */
-  private fun processBlocks(msg: BlocksMessage?) {
-    logger.debug("Processing BlocksMessage")
-
-    if (msg == null) {
-      throw MessageDecodeException("BlocksMessage decode failed.")
+        peer.manager.blockChain.pushBlock(msg.block)
     }
 
-    manager.processPeerBlocks(peer, msg.blocks)
-  }
+    /**
+     * NewTransactionsMessage handler
+     */
+    private fun processNewTransactions(msg: NewTransactionsMessage?) {
+        logger.debug("Processing NewTransactionsMessage")
 
-  /**
-   * NewBlock handler
-   */
-  private fun processNewBlock(msg: NewBlockMessage?) {
-    logger.debug("Processing NewBlockMessage")
+        if (msg == null) {
+            throw MessageDecodeException("NewTransactionsMessage decode failed.")
+        }
 
-    if (msg == null) {
-      throw MessageDecodeException("NewBlockMessage decode failed.")
+        peer.manager.addPendingTransactions(msg.transactions)
     }
 
-    peer.manager.blockChain.pushBlock(msg.block)
-  }
-
-  /**
-   * NewTransactionsMessage handler
-   */
-  private fun processNewTransactions(msg: NewTransactionsMessage?) {
-    logger.debug("Processing NewTransactionsMessage")
-
-    if (msg == null) {
-      throw MessageDecodeException("NewTransactionsMessage decode failed.")
+    /**
+     * DisconnectMessage handler
+     */
+    private fun processDisconnect() {
+        peer.close()
     }
 
-    peer.manager.addPendingTransactions(msg.transactions)
-  }
+    /**
+     * StatusMessage handler
+     */
+    private fun processStatus(msg: StatusMessage?) {
+        if (msg == null) {
+            throw MessageDecodeException("StatusMessage decode failed.")
+        }
 
-  /**
-   * DisconnectMessage handler
-   */
-  private fun processDisconnect() {
-    peer.close()
-  }
+        peer.protocolVersion = msg.protocolVersion
+        peer.networkId = msg.networkId
+        peer.totalDifficulty = msg.totalDifficulty
+        peer.bestHash = msg.bestHash
+        peer.genesisHash = msg.genesisHash
 
-  /**
-   * StatusMessage handler
-   */
-  private fun processStatus(msg: StatusMessage?) {
-    if (msg == null) {
-      throw MessageDecodeException("StatusMessage decode failed.")
+        val bestBlock = peer.manager.blockChain.bestBlock
+        val myTotalDifficulty = bestBlock.totalDifficulty
+        val peerTotalDifficulty = peer.totalDifficulty
+        if (peerTotalDifficulty != null && peerTotalDifficulty > myTotalDifficulty) {
+            logger.debug("Peer total difficulty was greater than mine.")
+
+            manager.startSync(peer)
+
+        }
+
+        logger.debug(
+                "Peer status { Protocol Version:${msg.protocolVersion} NetworkId:${msg.networkId} Total Difficulty:${msg.totalDifficulty} }")
     }
-
-    peer.protocolVersion = msg.protocolVersion
-    peer.networkId = msg.networkId
-    peer.totalDifficulty = msg.totalDifficulty
-    peer.bestHash = msg.bestHash
-    peer.genesisHash = msg.genesisHash
-
-    val bestBlock = peer.manager.blockChain.bestBlock
-    val myTotalDifficulty = bestBlock.totalDifficulty
-    val peerTotalDifficulty = peer.totalDifficulty
-    if (peerTotalDifficulty != null && peerTotalDifficulty > myTotalDifficulty) {
-      logger.debug("Peer total difficulty was greater than mine.")
-
-      manager.startSync(peer)
-
-    }
-
-    logger.debug(
-        "Peer status { Protocol Version:${msg.protocolVersion} NetworkId:${msg.networkId} Total Difficulty:${msg.totalDifficulty} }")
-  }
 
 }
 

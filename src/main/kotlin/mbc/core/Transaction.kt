@@ -16,39 +16,39 @@ import java.util.*
 class Transaction(val senderAddress: ByteArray, val receiverAddress: ByteArray, val amount: BigInteger,
                   val time: DateTime, val publicKey: PublicKey, var signature: ByteArray = ByteArray(0)) {
 
-  /**
-   * 交易合法性验证。目前只验证签名长度和签名合法性。
-   */
-  val isValid: Boolean
-    get() = (signature.isNotEmpty() && CryptoUtil.verifyTransactionSignature(this, signature))
+    /**
+     * 交易合法性验证。目前只验证签名长度和签名合法性。
+     */
+    val isValid: Boolean
+        get() = (signature.isNotEmpty() && CryptoUtil.verifyTransactionSignature(this, signature))
 
-  /**
-   * 用发送方的私钥进行签名。
-   */
-  fun sign(privateKey: PrivateKey): ByteArray {
-    signature = CryptoUtil.signTransaction(this, privateKey)
-    return signature
-  }
-
-  fun encode(): ByteArray {
-    return CodecUtil.encodeTransaction(this)
-  }
-
-  override fun equals(o: Any?): Boolean {
-    if (o is Transaction) {
-      if (!Arrays.equals(this.senderAddress, o.senderAddress)) return false
-      if (!Arrays.equals(this.receiverAddress, o.receiverAddress)) return false
-      if (this.amount != o.amount) return false
-      if (this.time != o.time) return false
-      if (this.publicKey != o.publicKey) return false
-
-      return true
-    } else {
-      return false
+    /**
+     * 用发送方的私钥进行签名。
+     */
+    fun sign(privateKey: PrivateKey): ByteArray {
+        signature = CryptoUtil.signTransaction(this, privateKey)
+        return signature
     }
-  }
 
-  override fun toString(): String {
-    return "${Hex.toHexString(senderAddress)} send $amount to ${Hex.toHexString(receiverAddress)} in $time"
-  }
+    fun encode(): ByteArray {
+        return CodecUtil.encodeTransaction(this)
+    }
+
+    override fun equals(o: Any?): Boolean {
+        if (o is Transaction) {
+            if (!Arrays.equals(this.senderAddress, o.senderAddress)) return false
+            if (!Arrays.equals(this.receiverAddress, o.receiverAddress)) return false
+            if (this.amount != o.amount) return false
+            if (this.time != o.time) return false
+            if (this.publicKey != o.publicKey) return false
+
+            return true
+        } else {
+            return false
+        }
+    }
+
+    override fun toString(): String {
+        return "${Hex.toHexString(senderAddress)} send $amount to ${Hex.toHexString(receiverAddress)} in $time"
+    }
 }

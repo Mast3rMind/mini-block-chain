@@ -24,32 +24,32 @@ import java.net.InetSocketAddress
  */
 class PeerClient(val manager: BlockChainManager) {
 
-  private val logger = LoggerFactory.getLogger(PeerClient::class.java)
+    private val logger = LoggerFactory.getLogger(PeerClient::class.java)
 
-  val group = NioEventLoopGroup()
+    val group = NioEventLoopGroup()
 
-  fun connectAsync(node: Node) {
+    fun connectAsync(node: Node) {
 
-    val b = Bootstrap()
-    b.group(group)
-        .channel(NioSocketChannel::class.java)
-        .remoteAddress(InetSocketAddress(node.ip, node.port))
+        val b = Bootstrap()
+        b.group(group)
+                .channel(NioSocketChannel::class.java)
+                .remoteAddress(InetSocketAddress(node.ip, node.port))
 
-    b.handler(object : ChannelInitializer<NioSocketChannel>() {
-      override fun initChannel(ch: NioSocketChannel) {
-        ch.pipeline()
-            .addLast(LengthFieldBasedFrameDecoder(Int.MAX_VALUE, 0, 4, 0, 4)) // 4个Byte的Length Header
-            .addLast(PeerClientHelloMessageHandler(node, manager)) // 对握手数据进行解码和处理
-      }
-    })
+        b.handler(object : ChannelInitializer<NioSocketChannel>() {
+            override fun initChannel(ch: NioSocketChannel) {
+                ch.pipeline()
+                        .addLast(LengthFieldBasedFrameDecoder(Int.MAX_VALUE, 0, 4, 0, 4)) // 4个Byte的Length Header
+                        .addLast(PeerClientHelloMessageHandler(node, manager)) // 对握手数据进行解码和处理
+            }
+        })
 
-    b.connect()
-  }
+        b.connect()
+    }
 
-  fun closeAsync() {
-    logger.info("PeerClient close")
-    group.shutdownGracefully()
-  }
+    fun closeAsync() {
+        logger.info("PeerClient close")
+        group.shutdownGracefully()
+    }
 
 }
 
@@ -58,67 +58,67 @@ class PeerClient(val manager: BlockChainManager) {
  */
 class PeerClientHelloMessageHandler(val node: Node, val manager: BlockChainManager) : ByteToMessageDecoder() {
 
-  private val logger = LoggerFactory.getLogger(PeerClientHelloMessageHandler::class.java)
+    private val logger = LoggerFactory.getLogger(PeerClientHelloMessageHandler::class.java)
 
-  /**
-   * 建立连接后应该首先握手(发送并接收HELLO消息)。
-   */
-  override fun channelActive(ctx: ChannelHandlerContext?) {
-    super.channelActive(ctx)
+    /**
+     * 建立连接后应该首先握手(发送并接收HELLO消息)。
+     */
+    override fun channelActive(ctx: ChannelHandlerContext?) {
+        super.channelActive(ctx)
 
-    val channel = ctx?.channel()
-    if (channel != null) {
-      sendHelloMessage(channel)
-    }
-  }
-
-  /**
-   * 服务器端返回HELLO消息后握手完成。
-   */
-  override fun decode(ctx: ChannelHandlerContext, data: ByteBuf, out: MutableList<Any>) {
-
-    val code = data.readByte()
-
-    val buffer = ByteArray(data.readableBytes())
-    data.readBytes(buffer)
-
-    if (code == MessageCodes.HELLO.code) {
-      val msg = HelloMessage.decode(buffer)
-
-      if (msg == null) { // 对方返回的数据无法正确解码，关闭连接。
-        ctx.close()
-      } else { // 握手完成！
-        val peer = Peer(node, manager, ctx.channel())
-
-        logger.info(
-            "PeerClient(${peer.channel.localAddress()}) finished handshake with ${peer.channel.remoteAddress()}")
-
-        peer.handshakeComplete = true
-
-        peer.sendStatusMessage()
-
-        // 将当前Peer加入到BlockChainManager
-        manager.addPeer(peer)
-
-        // 移除HELLO消息处理类
-        ctx.pipeline().remove(this)
-
-        // 增加区块链消息处理类
-        ctx.pipeline().addLast(MessageDecodeHandler(peer))
-      }
+        val channel = ctx?.channel()
+        if (channel != null) {
+            sendHelloMessage(channel)
+        }
     }
 
-  }
+    /**
+     * 服务器端返回HELLO消息后握手完成。
+     */
+    override fun decode(ctx: ChannelHandlerContext, data: ByteBuf, out: MutableList<Any>) {
 
-  fun sendHelloMessage(channel: Channel) {
-    val config = manager.blockChain.config
+        val code = data.readByte()
 
-    val msg = HelloMessage(config.getPeerVersion(), config.getClientId(), config.getPeerListenPort(),
-                           config.getNodeId())
+        val buffer = ByteArray(data.readableBytes())
+        data.readBytes(buffer)
 
-    logger.debug("Client ${channel.localAddress()} say HELLO to ${channel.remoteAddress()}")
+        if (code == MessageCodes.HELLO.code) {
+            val msg = HelloMessage.decode(buffer)
 
-    NetworkUtil.sendMessage(channel, msg)
-  }
+            if (msg == null) { // 对方返回的数据无法正确解码，关闭连接。
+                ctx.close()
+            } else { // 握手完成！
+                val peer = Peer(node, manager, ctx.channel())
+
+                logger.info(
+                        "PeerClient(${peer.channel.localAddress()}) finished handshake with ${peer.channel.remoteAddress()}")
+
+                peer.handshakeComplete = true
+
+                peer.sendStatusMessage()
+
+                // 将当前Peer加入到BlockChainManager
+                manager.addPeer(peer)
+
+                // 移除HELLO消息处理类
+                ctx.pipeline().remove(this)
+
+                // 增加区块链消息处理类
+                ctx.pipeline().addLast(MessageDecodeHandler(peer))
+            }
+        }
+
+    }
+
+    fun sendHelloMessage(channel: Channel) {
+        val config = manager.blockChain.config
+
+        val msg = HelloMessage(config.getPeerVersion(), config.getClientId(), config.getPeerListenPort(),
+                config.getNodeId())
+
+        logger.debug("Client ${channel.localAddress()} say HELLO to ${channel.remoteAddress()}")
+
+        NetworkUtil.sendMessage(channel, msg)
+    }
 
 }
